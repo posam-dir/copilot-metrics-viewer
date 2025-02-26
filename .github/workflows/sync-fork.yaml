@@ -22,6 +22,11 @@ jobs:
           git remote add upstream https://github.com/github-copilot-resources/copilot-metrics-viewer.git
           git fetch --all --tags --prune
 
+      - name: Configure Git
+        run: |
+          git config --global user.email "novotny@posam.sk"
+          git config --global user.name "Sync Fork workflow"
+
       - name: Sync main branch
         run: |
           git checkout main
