@@ -79,8 +79,9 @@ export class Options {
         if (since) options.since = since;
         if (until) options.until = until;
 
-        // Handle mocking
-        if (route.query.mock || config.public.isDataMocked) {
+        // Handle mocking — must explicitly be true/truthy string, not just any non-empty value
+        const isMocked = config.public.isDataMocked === true || config.public.isDataMocked === 'true';
+        if (route.query.mock || isMocked) {
             options.isDataMocked = true;
         }
 
@@ -421,6 +422,24 @@ export class Options {
 
             default:
                 return 'public/mock-data/organization_seats_response_sample.json';
+        }
+    }
+
+    /**
+     * Get the mock data path for per-user metrics based on scope
+     */
+    getUserMetricsMockDataPath(): string {
+        switch (this.scope) {
+            case 'team-organization':
+            case 'organization':
+                return 'public/mock-data/new-api/organization-users-28-day-report.json';
+
+            case 'team-enterprise':
+            case 'enterprise':
+                return 'public/mock-data/new-api/enterprise-users-28-day-report.json';
+
+            default:
+                return 'public/mock-data/new-api/organization-users-28-day-report.json';
         }
     }
 
