@@ -132,6 +132,18 @@ v-if="item === 'api response'" :metrics="metrics" :original-metrics="originalMet
 
     </div>
 
+    <!-- AI Chat Panel (feature-gated) -->
+    <AiChatPanel
+      v-if="config?.public?.enableAiChat === true || config?.public?.enableAiChat === 'true'"
+      :current-tab="tab"
+      :query-params="aiQueryParams"
+      :metrics="metrics"
+      :seats="seats"
+      :total-seats="seatsTotalCount"
+      :user-metrics="userMetrics"
+      :report-data="reportData"
+    />
+
   </div>
 </template>
 <script lang='ts'>
@@ -157,8 +169,10 @@ import AgentActivityViewer from './AgentActivityViewer.vue'
 import PullRequestViewer from './PullRequestViewer.vue'
 import DateRangeSelector from './DateRangeSelector.vue'
 import UserMetricsViewer from './UserMetricsViewer.vue'
+import AiChatPanel from './AiChatPanel.vue'
 import { Options } from '@/model/Options';
 import { useRoute } from 'vue-router';
+import { applyHiddenTabs, applyHistoricalModeFilter } from '@/utils/tabUtils';
 
 export default defineNuxtComponent({
   name: 'MainComponent',
@@ -173,7 +187,8 @@ export default defineNuxtComponent({
     AgentActivityViewer,
     PullRequestViewer,
     DateRangeSelector,
-    UserMetricsViewer
+    UserMetricsViewer,
+    AiChatPanel
   },
   methods: {
     logout() {
@@ -349,6 +364,12 @@ export default defineNuxtComponent({
     }
     
     this.config = useRuntimeConfig();
+
+    // Auto-hide teams tab when historical mode is disabled (team metrics require DB)
+    this.tabItems = applyHistoricalModeFilter(this.tabItems, this.config.public.enableHistoricalMode as boolean | string);
+
+    // Filter out hidden tabs based on NUXT_PUBLIC_HIDDEN_TABS environment variable
+    this.tabItems = applyHiddenTabs(this.tabItems, this.config.public.hiddenTabs as string);
   },
   async mounted() {
     // Load initial data
@@ -440,6 +461,11 @@ export default defineNuxtComponent({
       })
     });
 
+    const aiQueryParams = computed(() => {
+      const options = Options.fromRoute(route.value, dateRange.value.since, dateRange.value.until);
+      return options.toParams();
+    });
+
     return {
       showLogoutButton,
       mockedDataMessage,
@@ -454,6 +480,7 @@ export default defineNuxtComponent({
       route,
       seatsCurrentPage,
       seatsQueryParams,
+      aiQueryParams,
     };
   },
 })

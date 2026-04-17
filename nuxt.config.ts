@@ -83,6 +83,9 @@ export default defineNuxtConfig({
   },
   runtimeConfig: {
     githubToken: '',
+    aiToken: '',  // Dedicated token for GitHub Models API (NUXT_AI_TOKEN). Falls back to githubToken.
+    aiModel: 'gpt-4o',  // Model for AI chat (NUXT_AI_MODEL)
+    aiMaxToolRounds: '5',  // Max tool-calling iterations (NUXT_AI_MAX_TOOL_ROUNDS)
     session: {
       // set to 6h - same as the GitHub token
       maxAge: 60 * 60 * 6,
@@ -103,9 +106,13 @@ export default defineNuxtConfig({
       usingGithubAuth: false,
       version,
       isPublicApp: false,
+      // Deployment metadata (set via NUXT_PUBLIC_DEPLOY_INFO for preview environments)
+      deployInfo: '',
       // New API migration flags
       useLegacyApi: false,  // Set true to use deprecated /copilot/metrics API (USE_LEGACY_API)
-      enableHistoricalMode: false  // Enable storage-backed historical queries (NUXT_PUBLIC_ENABLE_HISTORICAL_MODE)
+      enableHistoricalMode: false,  // Enable storage-backed historical queries (NUXT_PUBLIC_ENABLE_HISTORICAL_MODE)
+      hiddenTabs: '',  // Comma-separated list of tab names to hide (NUXT_PUBLIC_HIDDEN_TABS)
+      enableAiChat: true,  // Enable AI-powered chat for metrics Q&A (NUXT_PUBLIC_ENABLE_AI_CHAT)
     }
   }
 })
