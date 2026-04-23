@@ -12,7 +12,35 @@
  *   - NUXT_GITHUB_TOKEN: GitHub personal access token
  *   - SYNC_DAYS_BACK: Number of days to sync (default: 28, uses bulk download)
  *   - DATABASE_URL: PostgreSQL connection string (or use PG* env vars)
+ *   - HTTP_PROXY: Optional HTTP/HTTPS proxy URL (e.g. http://proxy:8080)
+ *   - CUSTOM_CA_PATH: Optional path to a custom CA certificate file
  */
+
+// Initialize proxy agent before any fetch calls (mirrors server/plugins/http-agent.ts)
+import { ProxyAgent, setGlobalDispatcher } from 'undici';
+import { readFileSync, existsSync } from 'fs';
+
+if (process.env.HTTP_PROXY) {
+  try {
+    const tlsOptions = process.env.CUSTOM_CA_PATH ? (() => {
+      if (!existsSync(process.env.CUSTOM_CA_PATH!)) {
+        throw new Error(`CUSTOM_CA_PATH file not found: ${process.env.CUSTOM_CA_PATH}`);
+      }
+      return { tls: { ca: [readFileSync(process.env.CUSTOM_CA_PATH!)] } };
+    })() : {};
+
+    const proxyAgent = new ProxyAgent({
+      uri: process.env.HTTP_PROXY,
+      ...tlsOptions
+    });
+
+    setGlobalDispatcher(proxyAgent);
+    console.info(`Proxy agent initialized: ${process.env.HTTP_PROXY}`);
+  } catch (error) {
+    console.error('Failed to initialize proxy agent:', error);
+    process.exit(1);
+  }
+}
 
 import { syncBulk } from './services/sync-service';
 import { initSchema } from './storage/db';
@@ -22,10 +50,12 @@ async function runSync() {
   const logger = console;
 
   // Get configuration from environment
-  const scope = process.env.NUXT_PUBLIC_SCOPE || 'organization';
+  const rawScope = process.env.NUXT_PUBLIC_SCOPE || 'organization';
+  const scope = (rawScope === 'team-organization' ? 'organization'
+    : rawScope === 'team-enterprise' ? 'enterprise'
+    : rawScope) as 'organization' | 'enterprise';
   const githubOrg = process.env.NUXT_PUBLIC_GITHUB_ORG;
   const githubEnt = process.env.NUXT_PUBLIC_GITHUB_ENT;
-  const githubTeam = process.env.NUXT_PUBLIC_GITHUB_TEAM;
   const githubToken = process.env.NUXT_GITHUB_TOKEN;
   const daysBack = parseInt(process.env.SYNC_DAYS_BACK || '28', 10);
 
@@ -56,10 +86,11 @@ async function runSync() {
 
     // Use bulk download — one API call for up to 28 days
     const result = await syncBulk(
-      scope as any,
+      scope,
       identifier,
       headers,
-      githubTeam || undefined
+      undefined,
+      daysBack
     );
 
     logger.info(`Sync completed: ${result.savedDays} saved, ${result.skippedDays} skipped`);

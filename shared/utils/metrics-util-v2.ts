@@ -140,7 +140,7 @@ export async function getMetricsDataV2(event: H3Event<EventHandlerRequest>): Pro
     const startDate = options.since || new Date(Date.now() - 27 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
     logger.info(`Historical mode: checking DB for ${identifier} (${startDate} to ${endDate})`);
 
-    const isTeamScope = options.scope === 'team-organization' || options.scope === 'team-enterprise';
+    const isTeamScope = !!options.githubTeam;
 
     try {
       if (isTeamScope && options.githubTeam) {
@@ -233,6 +233,23 @@ export async function getMetricsDataV2(event: H3Event<EventHandlerRequest>): Pro
       metrics: filterHolidaysFromMetrics(metrics, options.excludeHolidays || false, options.locale),
       reportData: []
     });
+  }
+
+  // Team-scoped direct API path: fetch user-level records, filter by team, aggregate
+  if (options.githubTeam) {
+    logger.info(`Direct API team path: resolving members for team "${options.githubTeam}" in ${identifier}`);
+    const teamMembers = await fetchAllTeamMembers(options, event.context.headers);
+    if (teamMembers.length === 0) {
+      logger.info('No team members found — returning empty metrics');
+      return { metrics: [], reportData: [] };
+    }
+    const teamLogins = new Set(teamMembers.map(m => m.login));
+
+    const request: MetricsReportRequest = { scope: options.scope!, identifier };
+    const userDayRecords = await fetchRawUserDayRecords(request, event.context.headers);
+    logger.info(`Aggregating team metrics from ${userDayRecords.length} user-day records (${teamMembers.length} team members)`);
+    const report = aggregateTeamMetrics(userDayRecords, teamLogins);
+    return buildFilteredResult(report, options);
   }
 
   logger.info('Using new Copilot Metrics API (direct, no DB)');
