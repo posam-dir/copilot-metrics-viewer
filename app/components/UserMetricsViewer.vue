@@ -120,9 +120,9 @@
     <v-container v-if="userMetrics.length > 0" :fluid="chartColumns === 'full'" :class="['elevation-2 mt-2 mb-2', chartColumns === 'full' ? 'px-0' : 'px-4']">
       <div class="d-flex justify-end mb-2">
         <v-btn-toggle v-model="chartColumns" density="compact" variant="outlined" mandatory>
-          <v-btn value="1" size="small" icon="mdi-view-agenda" title="Single column" />
-          <v-btn value="2" size="small" icon="mdi-view-grid" title="Two columns" />
-          <v-btn value="full" size="small" icon="mdi-fullscreen" title="Full width" />
+          <v-btn value="1" size="small" title="Single column"><v-icon size="18">mdi-view-agenda</v-icon></v-btn>
+          <v-btn value="2" size="small" title="Two columns"><v-icon size="18">mdi-view-grid</v-icon></v-btn>
+          <v-btn value="full" size="small" title="Full width"><v-icon size="18">mdi-fullscreen</v-icon></v-btn>
         </v-btn-toggle>
       </div>
       <v-row class="mt-0 mb-2">
@@ -311,6 +311,19 @@
         </div>
 
         <v-row>
+          <!-- Empty state when no user selected -->
+          <v-col v-if="!selectedUser" cols="12">
+            <v-alert
+              type="info"
+              variant="tonal"
+              density="compact"
+              icon="mdi-cursor-pointer"
+              class="mb-2"
+            >
+              <strong>Select a user</strong> from the table above to see their individual usage details, language breakdown, model preferences, and activity history.
+            </v-alert>
+          </v-col>
+
           <!-- 1. Language Distribution -->
           <v-col cols="12" :md="chartColumns === '2' ? 6 : 12">
             <v-card variant="outlined" class="pa-4">
