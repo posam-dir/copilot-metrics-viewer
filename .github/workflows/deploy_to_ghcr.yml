@@ -10,10 +10,13 @@ on:
 
 permissions:
   packages: write
+  contents: read
 
 jobs:
   push_to_ghcr:
     runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
       - name: Checkout GitHub Action
         uses: actions/checkout@v4
@@ -48,15 +51,18 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}
 
       - name: Build and push
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           push: true
+          provenance: false
 
   push_sync_to_ghcr:
     runs-on: ubuntu-latest
+    env:
+      FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
     steps:
       - name: Checkout GitHub Action
         uses: actions/checkout@v4
@@ -86,13 +92,14 @@ jobs:
             type=semver,pattern={{major}}.{{minor}}
 
       - name: Build and push sync image
-        uses: docker/build-push-action@v5
+        uses: docker/build-push-action@v6
         with:
           context: .
           file: Dockerfile.sync
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           push: true
+          provenance: false
 
   deploy:
     runs-on: ubuntu-latest
@@ -101,7 +108,13 @@ jobs:
       name: 'production'
       url: ${{ steps.deploy-to-webapp.outputs.webapp-url }}
 
+    permissions:
+      contents: read
+
     steps:
+    # App settings (NUXT_PUBLIC_IS_DATA_MOCKED, NUXT_PUBLIC_SCOPE, etc.) are
+    # configured directly in the Azure Portal under Configuration > App Settings.
+    # They do not need to be set here — publish-profile auth doesn't support az cli.
     - name: Deploy to Azure Web App
       id: deploy-to-webapp
       uses: azure/webapps-deploy@v2
