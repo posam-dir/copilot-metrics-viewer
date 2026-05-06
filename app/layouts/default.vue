@@ -5,7 +5,7 @@
     </v-main>
     <v-footer class="bg-primary text-center d-flex flex-column fixed-footer">
       <div class="px-4 py-2 text-center w-100">
-        {{ new Date().getFullYear() }} — <strong><a href="https://github.com/github-copilot-resources/copilot-metrics-viewer" target="_blank" rel="noopener noreferrer" style="color: inherit;">Copilot Metrics Viewer</a></strong> — {{ version }}<span v-if="deployInfo"> — {{ deployInfo }}</span>
+        {{ new Date().getFullYear() }} — <strong><a href="https://github.com/github-copilot-resources/copilot-metrics-viewer" target="_blank" rel="noopener noreferrer" style="color: inherit;">Copilot Metrics Viewer</a></strong> — <a :href="`https://github.com/github-copilot-resources/copilot-metrics-viewer/releases/tag/v${version}`" target="_blank" rel="noopener noreferrer" style="color: inherit;">{{ version }}</a><span v-if="deployInfo"> — {{ deployInfo }}</span>
       </div>
     </v-footer>
   </v-app>
@@ -13,16 +13,25 @@
 
 <script lang="ts" setup>
 import { routeParamStr } from '@/utils/routeUtils';
+import { resolveDisplayName } from '#shared/utils/resolveDisplayName';
 
 const config = useRuntimeConfig();
 const version = computed(() => config.public.version);
 const deployInfo = computed(() => config.public.deployInfo);
 const route = useRoute();
-const pageTitle = computed(() => {
-  const base = getDisplayName(config.public);
-  const team = routeParamStr(route.params, 'team');
-  return team ? `${base} | Team : ${team}` : base;
-});
+const isMockMode = computed(() =>
+  !!config.public.isDataMocked ||
+  route.query.mock === 'true' || route.query.mock === '1'
+);
+const pageTitle = computed(() => resolveDisplayName({
+  urlOrg: routeParamStr(route.params, 'org'),
+  urlEnt: routeParamStr(route.params, 'ent'),
+  isMockMode: isMockMode.value,
+  configOrg: config.public.githubOrg as string,
+  configEnt: config.public.githubEnt as string,
+  configScope: config.public.scope as string,
+  teamName: routeParamStr(route.params, 'team'),
+}));
 useHead({
   title: pageTitle,
   meta: [

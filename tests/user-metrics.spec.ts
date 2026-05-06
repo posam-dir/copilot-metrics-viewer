@@ -185,8 +185,8 @@ describe('aggregateUserDayRecords', () => {
     const result = aggregateUserDayRecords(DAY_RECORDS);
     const alice = result.find(u => u.login === 'alice')!;
     expect(alice.totals_by_ide).toHaveLength(1); // both days used vscode
-    expect(alice.totals_by_ide![0].ide).toBe('vscode');
-    expect(alice.totals_by_ide![0].code_generation_activity_count).toBe(70); // 50+20
+    expect(alice.totals_by_ide![0]!.ide).toBe('vscode');
+    expect(alice.totals_by_ide![0]!.code_generation_activity_count).toBe(70); // 50+20
   });
 
   it('merges feature breakdowns by feature name', () => {
@@ -307,7 +307,7 @@ describe('UserTotals business logic', () => {
   });
 
   it('acceptance rate returns 0 for user with no completions', () => {
-    const noOps: UserTotals = { ...users[0], code_generation_activity_count: 0, code_acceptance_activity_count: 0 };
+    const noOps: UserTotals = { ...users[0]!, code_generation_activity_count: 0, code_acceptance_activity_count: 0 };
     expect(getAcceptanceRate(noOps)).toBe(0);
   });
 
@@ -318,7 +318,7 @@ describe('UserTotals business logic', () => {
   });
 
   it('getTopIde returns "—" when totals_by_ide is empty', () => {
-    const noIde: UserTotals = { ...users[0], totals_by_ide: [] };
+    const noIde: UserTotals = { ...users[0]!, totals_by_ide: [] };
     expect(getTopIde(noIde)).toBe('—');
   });
 
@@ -329,7 +329,7 @@ describe('UserTotals business logic', () => {
   });
 
   it('getTopLanguage returns "—" when no language data', () => {
-    const noLang: UserTotals = { ...users[0], totals_by_language_feature: [] };
+    const noLang: UserTotals = { ...users[0]!, totals_by_language_feature: [] };
     expect(getTopLanguage(noLang)).toBe('—');
   });
 });
@@ -343,18 +343,18 @@ describe('User report merging for large enterprises', () => {
       report_start_day: '2026-02-04',
       report_end_day: '2026-03-03',
       organization_id: '100000001',
-      user_totals: [SAMPLE_USER_REPORT.user_totals[0]],  // octocat
+      user_totals: [SAMPLE_USER_REPORT.user_totals[0]!],  // octocat
     };
     const file2: UserReport = {
       report_start_day: '2026-02-04',
       report_end_day: '2026-03-03',
       organization_id: '100000001',
-      user_totals: [SAMPLE_USER_REPORT.user_totals[1]],  // octokitten
+      user_totals: [SAMPLE_USER_REPORT.user_totals[1]!],  // octokitten
     };
 
     // Same logic as fetchLatestUserReport
     const reports = [file1, file2];
-    const merged: UserReport = { ...reports[0] };
+    const merged: UserReport = { ...reports[0]! };
     merged.user_totals = reports.flatMap(r => r.user_totals);
 
     expect(merged.user_totals).toHaveLength(2);
@@ -366,8 +366,7 @@ describe('User report merging for large enterprises', () => {
 
   it('handles single-file report without merging', () => {
     const reports = [SAMPLE_USER_REPORT];
-    const merged: UserReport = { ...reports[0] };
-    // Only merge when >1 file
+    const merged: UserReport = { ...reports[0]! };
     if (reports.length > 1) {
       merged.user_totals = reports.flatMap(r => r.user_totals);
     }
@@ -696,5 +695,43 @@ describe('/api/user-metrics handler – team filtering', () => {
     expect(Array.isArray(result)).toBe(true)
     expect(result).toHaveLength(1)
     expect((result as any[])[0].login).toBe('octokitten')
+  })
+
+  it('adds zero-filled stubs for team members with no usage data', async () => {
+    // Team has two members: octocat (active in storage) and inactiveuser (not in storage)
+    ;(globalThis as any).getQuery = () => ({
+      scope: 'organization',
+      githubOrg: 'test-org',
+      githubTeam: 'mixed-team',
+    })
+
+    const stored = {
+      reportStartDay: '2026-03-05',
+      reportEndDay: '2026-04-01',
+      userTotals: [SAMPLE_USER_REPORT.user_totals[0]], // only octocat (id:1)
+    }
+    mockGetLatestUserMetrics.mockResolvedValue(stored)
+    mockFetchAllTeamMembers.mockResolvedValue([
+      { login: 'octocat', id: 1 },       // active — has real usage data
+      { login: 'inactiveuser', id: 99 },  // inactive — no usage data in storage
+    ])
+
+    const { default: handler } = await import('../server/api/user-metrics')
+    const result = (await handler(makeEvent(true))) as any[]
+
+    expect(Array.isArray(result)).toBe(true)
+    expect(result).toHaveLength(2)
+
+    const active = result.find(u => u.login === 'octocat')
+    expect(active).toBeDefined()
+    expect(active.total_active_days).toBe(22) // preserved real data
+
+    const inactive = result.find(u => u.login === 'inactiveuser')
+    expect(inactive).toBeDefined()
+    expect(inactive.user_id).toBe(99)
+    expect(inactive.total_active_days).toBe(0)
+    expect(inactive.user_initiated_interaction_count).toBe(0)
+    expect(inactive.code_generation_activity_count).toBe(0)
+    expect(inactive.code_acceptance_activity_count).toBe(0)
   })
 })

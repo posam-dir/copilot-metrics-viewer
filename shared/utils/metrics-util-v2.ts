@@ -54,7 +54,6 @@ function isLegacyMode(): boolean {
 function isStorageModeEnabled(): boolean {
   const config = useRuntimeConfig();
   return config.public?.enableHistoricalMode === true || 
-         config.public?.enableHistoricalMode === 'true' ||
          process.env.ENABLE_HISTORICAL_MODE === 'true';
 }
 
@@ -74,7 +73,8 @@ async function fetchFromNewApi(
   const request: MetricsReportRequest = {
     scope: options.scope!,
     identifier,
-    teamSlug: options.githubTeam
+    teamSlug: options.githubTeam,
+    isMocked: options.isDataMocked,
   };
 
   const report = await fetchLatestReport(request, headers);
@@ -119,8 +119,8 @@ export async function getMetricsDataV2(event: H3Event<EventHandlerRequest>): Pro
   }
 
   // 1. Mock mode — return immediately, no DB, no API
-  //    Controlled by NUXT_PUBLIC_IS_DATA_MOCKED env var, not per-request params
-  if (isMockMode()) {
+  //    Controlled by NUXT_PUBLIC_IS_DATA_MOCKED env var OR per-request ?mock=true query param
+  if (isMockMode() || options.isDataMocked) {
     if (isLegacyMode()) {
       logger.info('Using mocked data mode (legacy format — USE_LEGACY_API=true)');
       const metrics = await getLegacyMetricsData(event);
@@ -130,7 +130,7 @@ export async function getMetricsDataV2(event: H3Event<EventHandlerRequest>): Pro
     logger.info('Using mocked data mode (new API format via HTTP download)');
     const identifier = options.githubOrg || options.githubEnt || 'mock-org';
     const scope = (options.scope || 'organization') as MetricsReportRequest['scope'];
-    const report = await fetchLatestReport({ scope, identifier }, new Headers());
+    const report = await fetchLatestReport({ scope, identifier, isMocked: true }, new Headers());
     const metrics = transformReportToMetrics(report);
     return sortMetricsDataResult({ metrics, reportData: report.day_totals });
   }
@@ -142,8 +142,8 @@ export async function getMetricsDataV2(event: H3Event<EventHandlerRequest>): Pro
     : (options.githubOrg || options.githubEnt || '');
   if (isStorageModeEnabled()) {
     // Default to last 28 days if no date range specified
-    const endDate = options.until || new Date().toISOString().split('T')[0];
-    const startDate = options.since || new Date(Date.now() - 27 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    const endDate = options.until || new Date().toISOString().split('T')[0]!;
+    const startDate = options.since || new Date(Date.now() - 27 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]!;
     logger.info(`Historical mode: checking DB for ${identifier} (${startDate} to ${endDate})`);
 
     const isTeamScope = !!options.githubTeam;
@@ -161,8 +161,7 @@ export async function getMetricsDataV2(event: H3Event<EventHandlerRequest>): Pro
         }
         const teamLogins = new Set(teamMembers.map(m => m.login));
 
-        const request: MetricsReportRequest = { scope: options.scope!, identifier };
-
+        const request: MetricsReportRequest = { scope: options.scope!, identifier, isMocked: options.isDataMocked };
         const userDayRecords = await getUserDayMetricsByDateRange(options.scope!, identifier, startDate, endDate);
         if (userDayRecords.length > 0) {
           logger.info(`Aggregating team metrics from ${userDayRecords.length} per-day user DB records`);
@@ -251,7 +250,7 @@ export async function getMetricsDataV2(event: H3Event<EventHandlerRequest>): Pro
     }
     const teamLogins = new Set(teamMembers.map(m => m.login));
 
-    const request: MetricsReportRequest = { scope: options.scope!, identifier };
+    const request: MetricsReportRequest = { scope: options.scope!, identifier, isMocked: options.isDataMocked };
     const userDayRecords = await fetchRawUserDayRecords(request, event.context.headers);
     logger.info(`Aggregating team metrics from ${userDayRecords.length} user-day records (${teamMembers.length} team members)`);
     const report = aggregateTeamMetrics(userDayRecords, teamLogins);
@@ -305,7 +304,7 @@ async function fetchAndStore(
   const identifier = options.githubOrg || options.githubEnt || '';
   const teamSlug = '';
 
-  const request: MetricsReportRequest = { scope: options.scope!, identifier };
+  const request: MetricsReportRequest = { scope: options.scope!, identifier, isMocked: options.isDataMocked };
 
   // Fetch org/enterprise aggregate
   const report = await fetchLatestReport(request, headers);
@@ -325,9 +324,9 @@ async function fetchAndStore(
   // Store each day's aggregate to DB
   // Both metrics and reportData are sorted by day, so indices align
   for (let i = 0; i < reportData.length; i++) {
-    const dayData = reportData[i];
+    const dayData = reportData[i]!;
     try {
-      await saveMetrics(options.scope!, identifier, dayData.day, metrics[i], teamSlug, dayData);
+      await saveMetrics(options.scope!, identifier, dayData.day, metrics[i]!, teamSlug, dayData);
     } catch (err) {
       logger.error(`Failed to store ${dayData.day}:`, err);
     }
