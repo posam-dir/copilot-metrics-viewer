@@ -371,7 +371,6 @@ curl -X POST http://localhost:3000/api/admin/sync \
 | `NUXT_SESSION_PASSWORD` | Session encryption key (min 32 chars) | Yes |
 | `DATABASE_URL` | PostgreSQL connection string | Historical mode only |
 | `ENABLE_HISTORICAL_MODE` | `true` to read metrics from database | Historical mode only |
-| `SYNC_ENABLED` | `true` for sync service, `false` for web app | Historical mode only |
 | `SYNC_DAYS_BACK` | Days to sync (default: 1 for daily, 28 for bulk) | Sync only |
 | `NUXT_PUBLIC_AUTH_PROVIDERS` | Comma-separated active providers: `github`, `google`, `microsoft`, `auth0`, `keycloak` — setting this enables authentication | OAuth mode |
 | `NUXT_OAUTH_GITHUB_CLIENT_ID` | GitHub App client ID | GitHub OAuth |
@@ -390,7 +389,7 @@ curl -X POST http://localhost:3000/api/admin/sync \
 | `NUXT_OAUTH_KEYCLOAK_REALM` | Keycloak realm name | Keycloak OAuth |
 | `NUXT_AUTHORIZED_USERS` | Comma-separated logins/emails allowed to log in (any provider) | Optional |
 | `NUXT_AUTHORIZED_EMAIL_DOMAINS` | Comma-separated email domains allowed, e.g. `company.com` | Optional |
-| `NUXT_USAGE_ADMINS` | Comma-separated logins/emails allowed to see the admin **Billing** tab. Empty list = anyone with dashboard access can see Billing. Set to restrict. Also required: `NUXT_GITHUB_BILLING_TOKEN`. | Optional |
+| `NUXT_USAGE_ADMINS` | Comma-separated logins/emails granted admin privileges. Admins see the **Billing tab** + **all users' rows** on User Metrics/Seats. Non-admins see only their own row (per [issue #398](https://github.com/github-copilot-resources/copilot-metrics-viewer/issues/398)). **Closed-by-default** in 3.11.0+ — empty value means NO admins. **PAT-mode deployments** (no OAuth configured) are exempt: every caller is treated as admin because there is no per-user identity to gate on, so lock such deployments down at the network layer (e.g. `PREVIEW_ALLOWED_IPS`). | Optional |
 | `NUXT_PUBLIC_ENTRA_CLIENT_ID` | App registration client ID for MSAL manager filter | Entra filter |
 | `NUXT_PUBLIC_ENTRA_TENANT_ID` | Tenant ID for MSAL (default: `common` for multi-tenant) | Entra filter |
 | `NUXT_APP_BASE_URL` | Base URL path for sub-path deployments, e.g. `/copilot-metrics-viewer/` | Sub-path proxy |
@@ -724,4 +723,3 @@ When using OAuth providers, update your redirect URIs to include the sub-path:
 | Auth0 | `https://your-host/copilot-metrics-viewer/auth/auth0` |
 | Keycloak | `https://your-host/copilot-metrics-viewer/auth/keycloak` |
 | MSAL popup | `https://your-host/copilot-metrics-viewer/api/msal/callback` |
-
